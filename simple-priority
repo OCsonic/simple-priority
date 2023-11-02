@@ -1,0 +1,88 @@
+#!/bin/bash
+if [[ "$UID" -ge "1000" ]]; then >&2 echo "This command needs to be ran as root to work!" && exit 1; fi
+if [ ! "$1" ]; then >&2 echo "Please set argument 1 to PID or use --help" && exit 1; fi
+if [ "$1" = "--help" ]; then
+	echo "usage:"
+	echo "  simple-priority <PID> <CHRT_SCHEDULER> <CHRT_PRIO_LEVEL> <DISK_SCHEDULER> <DISK_PRIO_LEVEL>"
+	echo "    Schedulers: (Priority level ranges go from highest priority to lowest priority.)"
+	echo "      CHRT Scheulers:"
+	echo "        [ 0 | default          | other       ] Valid level range 0" 
+	echo "        [ 1 | lowest_priority  | idle        ] Valid level range 0"
+	echo "        [ 2 | varying_priority | batch       ] Valid level range 0"
+	echo "        [ 3 | high_priority    | rr          ] Valid level range 99-1"
+	echo "        [ 4 | highest_priority | fifo        ] Valid level range 99-1"
+	echo "      Disk Scheulers:"
+	echo "        [ 0 | unset            | none        ] Valid level range N/A"
+	echo "        [ 1 | lowest_priority  | idle        ] Valid level range N/A"
+	echo "        [ 2 | varying_priority | best-effort ] Valid level range 0-7"
+	echo "        [ 3 | first_priority   | realtime    ] Valid level range 0-7"
+	exit
+else
+	PID=${1}
+fi
+# CHRT Priority
+if [ ! "$2" ]; then >&2 echo "Please set argument 2 to CHRT scheduler type" && exit 1; fi
+case $2 in
+	0|default|other)
+		CHRTPRIO="--other"
+		;;
+	1|lowest_priority|idle)
+		CHRTPRIO="--idle"
+		;;
+	2|varying_priority|batch)
+		CHRTPRIO="--batch"
+		;;
+	3|high_priority|rr)
+		CHRTPRIO="--rr"
+		;;
+	4|highest_priority|fifo)
+		CHRTPRIO="--fifo"
+		;;
+	*)
+		>&2 echo "Invalid CHRT scheduler!"
+		exit 1
+		;;
+esac
+if [ ! "$3" ]; then >&2 echo "Please set argument 3 to CHRT priority level" && exit 1; fi
+case $CHRTPRIO in
+	--other|--idle|--batch)
+		if [[ "$3" > 0 ]]; then >&2 echo "CHRT priority level has to be 0 when CHRT scheduler is $CHRTPRIO" && exit 1; fi
+		CHRTPRIOLEVEL="0"
+		;;
+	*)
+		CHRTPRIOLEVEL="$3"
+		;;
+esac
+# Disk Priority
+if [ ! "$4" ]; then >&2 echo "Please set argument 4 to Disk scheduler type" && exit 1; fi
+case $4 in
+	0|none|unset)
+		DISKPRIO=0
+		;;
+	1|lowest_priority|idle)
+		DISKPRIO=1
+		;;
+	2|varying_priority|best-effort)
+		DISKPRIO=2
+		;;
+	3|first_priority|realtime)
+		DISKPRIO=3
+		;;
+	*)
+		>&2 echo "Invalid Disk scheduler!"
+		exit 1
+		;;
+esac
+case $DISKPRIO in
+	2|3)
+		if [ ! "$5" ]; then >&2 echo "Please set argument 5 to Disk priority level" && exit 1; fi
+		DISKCLASSDATA="$5"
+		;;
+esac
+# Run everything
+if [ ! "$DISKCLASSDATA" ]; then
+	ionice --class $DISKPRIO --pid ${PID}
+else
+	ionice --class $DISKPRIO --classdata $DISKCLASSDATA --pid ${PID}
+fi
+chrt --pid $CHRTPRIO $CHRTPRIOLEVEL ${PID}
