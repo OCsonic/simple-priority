@@ -1,5 +1,5 @@
 #!/bin/bash
-if [[ "$UID" -ge "1000" ]]; then >&2 echo "This command needs to be ran as root to work!" && exit 0; fi
+if [[ "$UID" -ge "1000" ]]; then >&2 echo "Priority not set, please run as root to set priority!" && exit 0; fi
 if [ ! "$1" ]; then >&2 echo "Please set argument 1 to PID or use --help" && exit 1; fi
 if [ "$1" = "--help" ]; then
 	echo "usage:"
